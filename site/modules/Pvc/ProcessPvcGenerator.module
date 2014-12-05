@@ -1,0 +1,209 @@
+<?php
+/**
+ * Pvc Generator Module V. 0.1.0
+ * Part of Pvc, a module for ProcessWire 2.4+
+ *
+ * by Oliver Wehn
+ * https://github.com/oliverwehn
+ *
+ * processPvcGenerator provides a scaffolding tool
+ * for PW backend.
+ *
+ */
+
+class ProcessPvcGenerator extends Process {
+
+  /**
+   * getModuleInfo is a module required by all modules to tell ProcessWire about them
+   *
+   * @return array
+   *
+   */
+  public static function getModuleInfo() {
+
+    return array(
+      'title' => 'PvcGenerator',
+      'version' => 010,
+      'summary' => 'Provides a scaffolding helper in PW’s admin area.',
+      'href' => '',
+      'singular' => true,
+      'autoload' => true,
+      'requires' => array( 'PvcCore' ),
+      'icon' => 'smile-o',
+      );
+  }
+
+
+  public function init() {  }
+
+  public function ___execute() {
+
+
+    $table = $this->getListTable($this->templates);
+
+    return $table->render();
+  }
+
+  public function ___getListTable($templates) {
+    $table = $this->modules->get("MarkupAdminDataTable");
+    $table->setEncodeEntities(false);
+    $useLabels = false;
+
+    $rows = array();
+    $flagDefs = array(
+      'system' => array(
+        'label' => $this->_x('system', 'list-note'),
+        'icon' => 'puzzle-piece'
+        ),
+      'access' => array(
+        'label' => $this->_x('access', 'list-note'),
+        'icon' => 'key'
+        ),
+      'no-file' => array(
+        'label' => $this->_x('no-file', 'list-note'),
+        'icon' => 'ban'
+        ),
+      'cache' => array(
+        'label' => $this->_x('cache', 'list-note'),
+        'icon' => 'clock-o'
+        ),
+      'url-segments' => array(
+        'label' => $this->_x('URL segments', 'list-note'),
+        'icon' => 'sitemap'
+        ),
+      'page-numbers' => array(
+        'label' => $this->_x('Page numbers', 'list-note'),
+        'icon' => 'list-ol'
+        )
+      );
+
+
+    foreach($templates as $template) {
+      if($template->pageClass || $template->name == 'admin') continue;
+      $controllerClass = $this->pvc->getClassName($template->name, 'controller');
+      $controllerPath = $this->pvc->paths->controllers . $this->pvc->getFilenameFromClass($controllerClass);
+      if($controllerExists = file_exists($controllerPath))
+        $controllerActions = $this->pvc->getControllerActions($controllerClass);
+      else
+        $controllerActions = array();
+      $viewClass = $this->pvc->getClassName($template->name, 'view');
+      $viewPath = $this->pvc->paths->views . $this->pvc->getFilenameFromClass($viewClass);
+      $viewExists = file_exists($viewPath);
+      $templatesPath = dirname($viewPath) . '/' . $template->name . '/';
+
+      $nothingThere = !$controllerExists && !$viewExists && !is_dir($templatesPath);
+
+      // $flags = array();
+      // $notes = '';
+
+      // $filterField = $this->session->ProcessTemplateFilterField;
+      // $filterSystem = $this->session->ProcessTemplateFilterSystem;
+
+      // if($template->flags & Template::flagSystem) {
+      //   if(!$filterSystem && !$filterField) return array();
+      //   $flags[] = 'system';
+      // }
+      // if($filterField && !$template->fieldgroup->has($filterField)) return array();
+      // if($template->useRoles) $flags[] = 'access';
+      // if(!$template->filenameExists()) $flags[] = 'no-file';
+      // if($template->cache_time > 0) $flags[] = 'cache';
+      // if($template->urlSegments) $flags[] = 'url-segments';
+      // if($template->allowPageNum) $flags[] = 'page-numbers';
+
+      // $notes = '';
+      // foreach($flags as $flag) {
+      //   $class = 'templateFlag' . ucfirst($flag);
+      //   $flag = $flagDefs[$flag];
+      //   $label = str_replace('-', ' ', ucfirst($flag['label']));
+      //   $notes .= "<a class='tooltip templateFlag $class' title='$label'><i class='fa fa-$flag[icon]'></i>&nbsp;</a> ";
+      // }
+
+      // $numPages = $template->getNumPages();
+      // $numPagesLink = $this->config->urls->admin . "page/search/?show_options=1&template={$template->name}&sort=title";
+
+      // $numFields = count($template->fieldgroup);
+      // if($template->fieldgroup && $template->fieldgroup->name != $template->name) $numFields .= " " . $template->fieldgroup->name;
+      // $numFieldsLink = "../field/?templates_id={$template->id}&nosave=1";
+
+      $row = array();
+      if($nothingThere) {
+        $row[] = "<a name=\"{$template->name}\" href=\"generate/?scaffold={$template->name}\" title=\"{$this->_('Genereate scaffold')}\"><s>{$template->name}</s></a>";
+      }
+      else {
+        $row[] = "<strong>{$template->name}</strong><a name=\"{$template->name}\">&nbsp;</a>";
+        if(!$controllerExists)
+          $row["<s>{$controllerClass}</s>"] =  "generate/?item={$controllerClass}";
+        else
+          $row[] = $controllerClass;
+
+        if(!$viewExists)
+          $row["<s>{$viewClass}</s>"] =  "generate/?item={$viewClass}";
+        else
+          $row[] = $viewClass;
+
+        $actionTemplates = "";
+        foreach($controllerActions as $action) {
+          $actionTemplateName = $this->pvc->getFilename($action, 'template');
+          $actionTemplatePath = $templatesPath . $actionTemplateName;
+          if(!file_exists($actionTemplatePath))
+            $actionTemplates .= "<a href=\"generate/?item={$template->name}/{$actionTemplateName}\"><s>{$actionTemplateName}</s></a><br />\n";
+          else
+            $actionTemplates .= "{$actionTemplateName}<br/>\n";
+        }
+        $row[] = $actionTemplates;
+      }
+      if(!empty($row)) $table->row($row);
+    }
+
+    $header = array();
+    $header[] = $this->_x('Template', 'list-thead');
+    if($useLabels) $header[] = $this->_x('Label', 'list-thead');
+    $header[] = $this->_x('Controller', 'list-thead');
+    $header[] = $this->_x('View', 'list-thead');
+    $header[] = $this->_x('Action Templates', 'list-thead');
+    $table->headerRow($header);
+
+    foreach($rows as $row) $table->row($row);
+
+    return $table;
+  }
+
+  /**
+   * Install the module and related modules
+   *
+   */
+  public function ___install() {
+
+    $adminPage = $this->pages->get($this->config->adminRootPageID);
+    $setupPage = $adminPage->child("name=setup");
+
+    $configData = array();
+
+    // create list page
+    $list = new Page();
+    $list->parent = $setupPage;
+    $list->template = $this->templates->get('admin');
+    $list->process = $this;
+    $list->name = 'pvc-generator';
+    $list->title = 'PVC Scaffolds';
+    $list->status = Page::statusSystem;
+    $list->sort = $setupPage->numChildren;
+    $list->save();
+
+    $configData['listPageID'] = $list->id;
+    $this->modules->saveModuleConfigData(get_class($this), $configData);
+
+  }
+
+  /**
+   * Uninstall the module and related modules
+   *
+   */
+  public function ___uninstall() {
+    $configData = wire('modules')->getModuleConfigData(get_class($this));
+    if($list = $this->pages->find($configData['listPageID'])) {
+      $this->pages->delete($list);
+    }
+
+  }
+}
